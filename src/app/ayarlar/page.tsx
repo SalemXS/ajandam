@@ -553,7 +553,7 @@ export default function AyarlarPage() {
                 </div>
                 <div className="flex gap-3">
                     <Button variant="secondary" onClick={async () => { setSeeding(true); await seedData(); setSeeding(false); }} disabled={seeding} className="flex-1">{seeding ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />} {seeding ? 'Yükleniyor...' : 'Örnek Veri Yükle'}</Button>
-                    <Button variant="danger" onClick={() => { if (confirm('Tüm verileri silmek istediğinize emin misiniz?')) clearData(); }} className="flex-1"><Trash2 size={14} /> Tümünü Sil</Button>
+                    <Button variant="danger" onClick={async () => { if (confirm('Tüm verileri silmek istediğinize emin misiniz?')) { setSeeding(true); await clearData(); setSeeding(false); } }} disabled={seeding} className="flex-1"><Trash2 size={14} /> {seeding ? 'Siliniyor...' : 'Tümünü Sil'}</Button>
                 </div>
             </Card>
 

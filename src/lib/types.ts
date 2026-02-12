@@ -219,5 +219,5 @@ export interface AppState {
 
   // Seed
   seedData: () => Promise<void>;
-  clearData: () => void;
+  clearData: () => Promise<void>;
 }

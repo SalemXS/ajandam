@@ -386,18 +386,35 @@ export const useStore = create<AppState & {
             console.error('Seed data error:', error);
         }
     },
-    clearData: () => {
-        set({
-            projects: [],
-            tasks: [],
-            transactions: [],
-            goals: [],
-            goalTransactions: [],
-            notes: [],
-            reminders: [],
-            taskNotes: [],
-            settings: defaultSettings,
-            initialized: false,
-        });
+    clearData: async () => {
+        const userId = await getUserId();
+        if (!userId) return;
+
+        try {
+            // Delete in order: children first, then parents (FK constraints)
+            await supabase.from('goal_transactions').delete().eq('user_id', userId);
+            await supabase.from('task_notes').delete().eq('user_id', userId);
+            await supabase.from('reminders').delete().eq('user_id', userId);
+            await supabase.from('notes').delete().eq('user_id', userId);
+            await supabase.from('transactions').delete().eq('user_id', userId);
+            await supabase.from('tasks').delete().eq('user_id', userId);
+            await supabase.from('goals').delete().eq('user_id', userId);
+            await supabase.from('projects').delete().eq('user_id', userId);
+
+            set({
+                projects: [],
+                tasks: [],
+                transactions: [],
+                goals: [],
+                goalTransactions: [],
+                notes: [],
+                reminders: [],
+                taskNotes: [],
+                settings: defaultSettings,
+                initialized: true,
+            });
+        } catch (error) {
+            console.error('Clear data error:', error);
+        }
     },
 }));
