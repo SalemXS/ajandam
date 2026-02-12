@@ -6,6 +6,7 @@ import Sidebar from './Sidebar';
 import MobileNav from './MobileNav';
 import { useAuth } from '@/lib/auth';
 import { useStore } from '@/lib/store';
+import { scheduleTaskNotifications } from '@/lib/notifications';
 import TaskFormModal from '@/components/tasks/TaskFormModal';
 import TransactionFormModal from '@/components/finance/TransactionFormModal';
 import NoteFormModal from '@/components/notes/NoteFormModal';
@@ -17,7 +18,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     const { user, loading } = useAuth();
     const pathname = usePathname();
     const [quickAddType, setQuickAddType] = useState<'task' | 'transaction' | 'note' | 'reminder' | null>(null);
-    const { initialized, initializeData } = useStore();
+    const { initialized, initializeData, tasks } = useStore();
 
     // Initialize data when user is authenticated
     useEffect(() => {
@@ -25,6 +26,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             initializeData();
         }
     }, [user, initialized, initializeData]);
+
+    // Schedule notifications for upcoming tasks (native only)
+    useEffect(() => {
+        if (initialized && tasks.length > 0) {
+            scheduleTaskNotifications(tasks);
+        }
+    }, [initialized, tasks]);
 
     const isAuthRoute = AUTH_ROUTES.includes(pathname);
 
