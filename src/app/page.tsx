@@ -8,7 +8,7 @@ import {
   CheckSquare, TrendingUp, Wallet, Target, AlertTriangle, Clock,
   ArrowUpRight, ArrowDownRight, Bell, CalendarDays, Zap, Plus,
   ListTodo, Receipt, StickyNote, Sparkles, ArrowRight,
-  CircleDot, Activity, CheckCircle2, TrendingDown, AlertCircle
+  CircleDot, Activity, CheckCircle2, TrendingDown, AlertCircle, Settings
 } from 'lucide-react';
 import {
   formatCurrency, classifyDueDate, getDueDateLabel, getDueDateBgColor,
@@ -112,14 +112,22 @@ export default function DashboardPage() {
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2">
           {/* Greeting Header */}
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8">
-            <div>
-              <h1 className="text-3xl md:text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-400 mb-2">
-                {greeting.text}, {firstName} {greeting.emoji}
-              </h1>
-              <p className="text-gray-500 dark:text-gray-400 font-medium flex items-center gap-2">
-                <CalendarDays size={18} className="text-[rgb(var(--accent-500))]" />
-                {formatTurkishDate()}
-              </p>
+            <div className="flex items-start justify-between">
+              <div>
+                <h1 className="text-3xl md:text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-400 mb-2">
+                  {greeting.text}, {firstName} {greeting.emoji}
+                </h1>
+                <p className="text-gray-500 dark:text-gray-400 font-medium flex items-center gap-2">
+                  <CalendarDays size={18} className="text-[rgb(var(--accent-500))]" />
+                  {formatTurkishDate()}
+                </p>
+              </div>
+              <Link
+                href="/ayarlar"
+                className="md:hidden p-2.5 rounded-xl text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors press-effect flex-shrink-0"
+              >
+                <Settings size={22} />
+              </Link>
             </div>
             {/* Quick summary chips */}
             <div className="flex gap-2 flex-wrap">
