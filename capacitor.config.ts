@@ -5,13 +5,11 @@ const config: CapacitorConfig = {
     appName: 'Kişisel Ajanda',
     webDir: 'out',
     server: {
-        // For development: point to your local Next.js dev server
-        // For production: deploy your Next.js app and use the URL here
-        // url: 'http://10.0.2.2:3000', // Android emulator localhost
-        // url: 'http://192.168.x.x:3000', // Physical device (use your PC's IP)
+        // Production: load from Vercel deployment
+        url: 'https://ajandam.vercel.app',
 
         // Allow loading from Supabase
-        allowNavigation: ['*.supabase.co'],
+        allowNavigation: ['*.supabase.co', 'ajandam.vercel.app'],
 
         // Clear text traffic allowed for development
         androidScheme: 'https',
@@ -23,3 +21,4 @@ const config: CapacitorConfig = {
 };
 
 export default config;
+
