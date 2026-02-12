@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Kişisel Ajanda</string>
+    <string name="title_activity_main">Kişisel Ajanda</string>
+    <string name="package_name">com.salem.kisiselAjanda</string>
+    <string name="custom_url_scheme">com.salem.kisiselAjanda</string>
+</resources>

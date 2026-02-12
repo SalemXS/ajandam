@@ -1,0 +1,530 @@
+@import "tailwindcss";
+
+/* Enable class-based dark mode for Tailwind v4 */
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --font-inter: 'Inter', sans-serif;
+
+  /* Default accent: Violet */
+  --accent-50: 245 243 255;
+  --accent-100: 237 233 254;
+  --accent-200: 221 214 254;
+  --accent-300: 196 181 253;
+  --accent-400: 167 139 250;
+  --accent-500: 139 92 246;
+  --accent-600: 124 58 237;
+  --accent-700: 109 40 217;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(100, 100, 100, 0.3) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: rgba(100, 100, 100, 0.3);
+  border-radius: 3px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 100, 100, 0.5);
+}
+
+/* Safe area for mobile bottom nav */
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+/* Smooth transitions */
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-inter), system-ui, -apple-system, sans-serif;
+}
+
+/* ========================================
+   ANIMATION KEYFRAMES
+   ======================================== */
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-16px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes fadeInRight {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes pulseGlow {
+
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgb(var(--accent-500) / 0.4);
+  }
+
+  @keyframes shine {
+    0% {
+      background-position: 100%;
+    }
+
+    100% {
+      background-position: -100%;
+    }
+  }
+
+  .animate-shine {
+    animation: shine 5s linear infinite;
+  }
+
+  50% {
+    box-shadow: 0 0 16px 4px rgb(var(--accent-500) / 0.2);
+  }
+}
+
+@keyframes float {
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes slideInFromLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-100%);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes progressFill {
+  from {
+    width: 0;
+  }
+}
+
+@keyframes countUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes borderGlow {
+
+  0%,
+  100% {
+    border-color: rgb(var(--accent-500) / 0.2);
+  }
+
+  50% {
+    border-color: rgb(var(--accent-500) / 0.5);
+  }
+}
+
+@keyframes ringProgress {
+  from {
+    stroke-dashoffset: 283;
+  }
+}
+
+@keyframes modalEnter {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes overlayEnter {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+/* ========================================
+   ANIMATION UTILITY CLASSES
+   ======================================== */
+
+.animate-in {
+  animation: fadeIn 0.3s ease-out forwards;
+}
+
+.animate-fade-up {
+  animation: fadeInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  opacity: 0;
+}
+
+.animate-fade-down {
+  animation: fadeInDown 0.4s ease-out forwards;
+  opacity: 0;
+}
+
+.animate-fade-left {
+  animation: fadeInLeft 0.4s ease-out forwards;
+  opacity: 0;
+}
+
+.animate-fade-right {
+  animation: fadeInRight 0.4s ease-out forwards;
+  opacity: 0;
+}
+
+.animate-scale-in {
+  animation: scaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  opacity: 0;
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg, transparent 0%, rgb(255 255 255 / 0.1) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: shimmer 2s ease-in-out infinite;
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 2s ease-in-out infinite;
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.animate-progress {
+  animation: progressFill 1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-modal {
+  animation: modalEnter 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-overlay {
+  animation: overlayEnter 0.2s ease-out forwards;
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease-out forwards;
+}
+
+.slide-in-from-bottom {
+  animation: slideUp 0.3s ease-out forwards;
+}
+
+/* Stagger delay classes */
+.delay-0 {
+  animation-delay: 0ms;
+}
+
+.delay-1 {
+  animation-delay: 60ms;
+}
+
+.delay-2 {
+  animation-delay: 120ms;
+}
+
+.delay-3 {
+  animation-delay: 180ms;
+}
+
+.delay-4 {
+  animation-delay: 240ms;
+}
+
+.delay-5 {
+  animation-delay: 300ms;
+}
+
+.delay-6 {
+  animation-delay: 360ms;
+}
+
+.delay-7 {
+  animation-delay: 420ms;
+}
+
+.delay-8 {
+  animation-delay: 480ms;
+}
+
+/* ========================================
+   HOVER & INTERACTION EFFECTS
+   ======================================== */
+
+.hover-lift {
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease;
+}
+
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px -5px rgba(0, 0, 0, 0.1), 0 4px 10px -6px rgba(0, 0, 0, 0.1);
+}
+
+.hover-lift:active {
+  transform: translateY(0);
+}
+
+.hover-scale {
+  transition: transform 0.15s ease;
+}
+
+.hover-scale:hover {
+  transform: scale(1.02);
+}
+
+.hover-scale:active {
+  transform: scale(0.98);
+}
+
+.press-effect {
+  transition: transform 0.1s ease;
+}
+
+.press-effect:active {
+  transform: scale(0.95);
+}
+
+/* Glass effect */
+.glass {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Gradient text */
+.gradient-text {
+  background: linear-gradient(135deg, rgb(var(--accent-400)), rgb(var(--accent-600)));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ========================================
+   ACCENT COLOR UTILITIES
+   ======================================== */
+
+.accent-bg {
+  background-color: rgb(var(--accent-500));
+}
+
+.accent-bg-light {
+  background-color: rgb(var(--accent-500) / 0.15);
+}
+
+.accent-text {
+  color: rgb(var(--accent-500));
+}
+
+.accent-text-light {
+  color: rgb(var(--accent-400));
+}
+
+.accent-border {
+  border-color: rgb(var(--accent-500));
+}
+
+.accent-gradient {
+  background: linear-gradient(to right, rgb(var(--accent-500)), rgb(var(--accent-600)));
+}
+
+.accent-gradient-hover:hover {
+  background: linear-gradient(to right, rgb(var(--accent-600)), rgb(var(--accent-700)));
+}
+
+.accent-ring:focus {
+  box-shadow: 0 0 0 2px rgb(var(--accent-500) / 0.5);
+}
+
+.accent-progress-bar {
+  background: linear-gradient(to right, rgb(var(--accent-500)), rgb(var(--accent-600)));
+}
+
+/* ========================================
+   LINE CLAMP
+   ======================================== */
+
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.line-clamp-4 {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ========================================
+   MOBILE OPTIMIZATIONS
+   ======================================== */
+
+@media (max-width: 768px) {
+
+  button,
+  a,
+  input,
+  select,
+  textarea {
+    min-height: 44px;
+  }
+
+  select {
+    font-size: 16px;
+  }
+}
+
+/* ========================================
+   NAV ACTIVE INDICATOR
+   ======================================== */
+
+.nav-item-active {
+  position: relative;
+}
+
+.nav-item-active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 60%;
+  border-radius: 0 4px 4px 0;
+  background: linear-gradient(to bottom, rgb(var(--accent-400)), rgb(var(--accent-600)));
+  animation: scaleIn 0.2s ease-out;
+}
+
+/* Mobile tab active dot */
+.tab-active-dot::after {
+  content: '';
+  position: absolute;
+  bottom: 2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: rgb(var(--accent-500));
+  animation: scaleIn 0.2s ease-out;
+}
