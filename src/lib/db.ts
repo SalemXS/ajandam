@@ -1,66 +1,72 @@
-import { supabase } from './supabase';
-import { Project, Task, Transaction, Goal, GoalTransaction, TaskNote, Note, Reminder } from './types';
+import { Project, Task, Transaction, Goal, GoalTransaction, TaskNote, Note, Reminder, AppSettings } from './types';
 
-// ==================== HELPER: snake_case <-> camelCase ====================
-
-function snakeToCamel(obj: Record<string, unknown>): Record<string, unknown> {
-    const result: Record<string, unknown> = {};
-    for (const key of Object.keys(obj)) {
-        const camelKey = key.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
-        result[camelKey] = obj[key];
+// ==================== HELPER: Local Storage safe wrapper ====================
+const safeStorage = {
+    getItem: (key: string): string | null => {
+        if (typeof window === 'undefined') return null;
+        try { return window.localStorage.getItem(key); } catch { return null; }
+    },
+    setItem: (key: string, value: string) => {
+        if (typeof window === 'undefined') return;
+        try { window.localStorage.setItem(key, value); } catch { }
+    },
+    removeItem: (key: string) => {
+        if (typeof window === 'undefined') return;
+        try { window.localStorage.removeItem(key); } catch { }
     }
-    return result;
-}
-
-function camelToSnake(obj: Record<string, unknown>): Record<string, unknown> {
-    const result: Record<string, unknown> = {};
-    for (const key of Object.keys(obj)) {
-        const snakeKey = key.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
-        result[snakeKey] = obj[key];
-    }
-    return result;
-}
-
-// Convert array of DB rows to camelCase
-function rowsToCamel<T>(rows: Record<string, unknown>[]): T[] {
-    return rows.map(r => snakeToCamel(r) as T);
-}
+};
 
 // ==================== FETCH ALL DATA ====================
 
+// Simulate database read locally
+const getTable = (tableName: string, userId: string): any[] => {
+    const raw = safeStorage.getItem(`ajanda_${tableName}`);
+    if (!raw) return [];
+    try {
+        const rows = JSON.parse(raw);
+        return rows.filter((r: any) => r.userId === userId || r.user_id === userId || r.id === userId); // user_settings case
+    } catch {
+        return [];
+    }
+}
+
 export async function fetchAllData(userId: string) {
-    const [
-        { data: projects },
-        { data: tasks },
-        { data: transactions },
-        { data: goals },
-        { data: goalTransactions },
-        { data: taskNotes },
-        { data: notes },
-        { data: reminders },
-        { data: settingsRow },
-    ] = await Promise.all([
-        supabase.from('projects').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
-        supabase.from('tasks').select('*').eq('user_id', userId).order('order_index', { ascending: true }),
-        supabase.from('transactions').select('*').eq('user_id', userId).order('date', { ascending: false }),
-        supabase.from('goals').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
-        supabase.from('goal_transactions').select('*').eq('user_id', userId).order('date', { ascending: false }),
-        supabase.from('task_notes').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
-        supabase.from('notes').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
-        supabase.from('reminders').select('*').eq('user_id', userId).order('datetime', { ascending: true }),
-        supabase.from('user_settings').select('*').eq('id', userId).single(),
-    ]);
+    const projects = getTable('projects', userId);
+    const tasks = getTable('tasks', userId);
+    const transactions = getTable('transactions', userId);
+    const goals = getTable('goals', userId);
+    const goalTransactions = getTable('goal_transactions', userId);
+    const taskNotes = getTable('task_notes', userId);
+    const notes = getTable('notes', userId);
+    const reminders = getTable('reminders', userId);
+
+    // Sort logic mimics what the database used to do
+    const sortedProjects = [...projects].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    const sortedTasks = [...tasks].sort((a, b) => (a.orderIndex || 0) - (b.orderIndex || 0));
+    const sortedTransactions = [...transactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    const sortedGoals = [...goals].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    const sortedGoalTransactions = [...goalTransactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    const sortedTaskNotes = [...taskNotes].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    const sortedNotes = [...notes].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    const sortedReminders = [...reminders].sort((a, b) => new Date(a.datetime).getTime() - new Date(b.datetime).getTime());
+
+    const settingsRows = getTable('user_settings', userId);
+    let settings = settingsRows.length > 0 ? settingsRows[0] : null;
+
+    if (settings && typeof settings.customPalettes === 'string') {
+        try { settings.customPalettes = JSON.parse(settings.customPalettes); } catch { }
+    }
 
     return {
-        projects: rowsToCamel<Project>(projects || []),
-        tasks: rowsToCamel<Task>(tasks || []),
-        transactions: rowsToCamel<Transaction>(transactions || []),
-        goals: rowsToCamel<Goal>(goals || []),
-        goalTransactions: rowsToCamel<GoalTransaction>(goalTransactions || []),
-        taskNotes: rowsToCamel<TaskNote>(taskNotes || []),
-        notes: rowsToCamel<Note>(notes || []),
-        reminders: rowsToCamel<Reminder>(reminders || []),
-        settings: settingsRow ? snakeToCamel(settingsRow as Record<string, unknown>) : null,
+        projects: sortedProjects as Project[],
+        tasks: sortedTasks as Task[],
+        transactions: sortedTransactions as Transaction[],
+        goals: sortedGoals as Goal[],
+        goalTransactions: sortedGoalTransactions as GoalTransaction[],
+        taskNotes: sortedTaskNotes as TaskNote[],
+        notes: sortedNotes as Note[],
+        reminders: sortedReminders as Reminder[],
+        settings,
     };
 }
 
@@ -69,59 +75,127 @@ export async function fetchAllData(userId: string) {
 type TableName = 'projects' | 'tasks' | 'transactions' | 'goals' | 'goal_transactions' | 'task_notes' | 'notes' | 'reminders';
 
 export async function dbInsert(table: TableName, data: Record<string, unknown>) {
-    const snakeData = camelToSnake(data);
-    // Remove id if it's a client-generated one — let DB generate UUID
-    delete snakeData.id;
-    const { data: result, error } = await supabase.from(table).insert(snakeData).select().single();
-    if (error) {
-        console.error(`DB insert error (${table}):`, error);
-        throw error;
+    const userId = data.userId || data.user_id;
+    if (!userId) throw new Error("userId is required for dbInsert");
+
+    // Auto generate UUID if not provided. In real DB this was automatic.
+    const newId = data.id || crypto.randomUUID();
+
+    const newRow = {
+        ...data,
+        id: newId,
+        createdAt: data.createdAt || new Date().toISOString(),
+        updatedAt: data.updatedAt || new Date().toISOString()
+    };
+
+    const dbKey = `ajanda_${table}`;
+    const raw = safeStorage.getItem(dbKey);
+    let rows = [];
+    if (raw) {
+        try { rows = JSON.parse(raw); } catch { }
     }
-    return snakeToCamel(result as Record<string, unknown>);
+
+    rows.push(newRow);
+    safeStorage.setItem(dbKey, JSON.stringify(rows));
+
+    return newRow;
 }
 
 export async function dbUpdate(table: TableName, id: string, data: Record<string, unknown>) {
-    const snakeData = camelToSnake(data);
-    delete snakeData.id;
-    delete snakeData.user_id;
-    delete snakeData.created_at;
-    snakeData.updated_at = new Date().toISOString();
-    const { error } = await supabase.from(table).update(snakeData).eq('id', id);
-    if (error) {
-        console.error(`DB update error (${table}):`, error);
-        throw error;
+    const dbKey = `ajanda_${table}`;
+    const raw = safeStorage.getItem(dbKey);
+    let rows = [];
+    if (raw) {
+        try { rows = JSON.parse(raw); } catch { }
     }
+
+    const index = rows.findIndex((r: any) => r.id === id);
+    if (index === -1) {
+        console.warn(`Update failed: Row with id ${id} not found in ${table}`);
+        return;
+    }
+
+    const updatedData = { ...data };
+    delete updatedData.id;
+    delete updatedData.userId;
+    delete updatedData.user_id;
+    delete updatedData.createdAt;
+    delete updatedData.created_at;
+
+    rows[index] = {
+        ...rows[index],
+        ...updatedData,
+        updatedAt: new Date().toISOString()
+    };
+
+    safeStorage.setItem(dbKey, JSON.stringify(rows));
 }
 
 export async function dbDelete(table: TableName, id: string) {
-    const { error } = await supabase.from(table).delete().eq('id', id);
-    if (error) {
-        console.error(`DB delete error (${table}):`, error);
-        throw error;
+    const dbKey = `ajanda_${table}`;
+    const raw = safeStorage.getItem(dbKey);
+    if (!raw) return;
+
+    try {
+        const rows = JSON.parse(raw);
+        const filtered = rows.filter((r: any) => r.id !== id);
+
+        // Handle cascading deletes manually (since mock DB doesn't have CASCADE)
+        if (table === 'projects') {
+            // Cascade delete tasks if project is deleted
+            const tRaw = safeStorage.getItem('ajanda_tasks');
+            if (tRaw) {
+                const tRows = JSON.parse(tRaw).filter((t: any) => t.projectId !== id);
+                safeStorage.setItem('ajanda_tasks', JSON.stringify(tRows));
+            }
+        } else if (table === 'goals') {
+            // Cascade delete goal transactions
+            const gtRaw = safeStorage.getItem('ajanda_goal_transactions');
+            if (gtRaw) {
+                const gtRows = JSON.parse(gtRaw).filter((gt: any) => gt.goalId !== id);
+                safeStorage.setItem('ajanda_goal_transactions', JSON.stringify(gtRows));
+            }
+        }
+
+        safeStorage.setItem(dbKey, JSON.stringify(filtered));
+    } catch (e) {
+        console.error(`DB delete error (${table}):`, e);
     }
 }
 
 // ==================== SETTINGS ====================
 
 export async function dbUpsertSettings(userId: string, data: Record<string, unknown>) {
-    const snakeData = camelToSnake(data);
-    // Remove fields that don't belong in DB
-    delete snakeData.custom_palettes; // stored as JSON
+    const dbKey = `ajanda_user_settings`;
+    const raw = safeStorage.getItem(dbKey);
+    let rows = [];
+    if (raw) {
+        try { rows = JSON.parse(raw); } catch { }
+    }
 
-    const updateData: Record<string, unknown> = {
-        id: userId,
-        updated_at: new Date().toISOString(),
-        ...snakeData,
-    };
+    const index = rows.findIndex((r: any) => r.id === userId);
 
-    // Handle customPalettes -> JSONB
+    const updateData = { ...data };
+
     if (data.customPalettes !== undefined) {
-        updateData.custom_palettes = JSON.stringify(data.customPalettes);
+        updateData.customPalettes = JSON.stringify(data.customPalettes);
     }
 
-    const { error } = await supabase.from('user_settings').upsert(updateData);
-    if (error) {
-        console.error('DB settings upsert error:', error);
-        throw error;
+    if (index === -1) {
+        // Insert
+        rows.push({
+            id: userId,
+            ...updateData,
+            updatedAt: new Date().toISOString()
+        });
+    } else {
+        // Update
+        rows[index] = {
+            ...rows[index],
+            ...updateData,
+            updatedAt: new Date().toISOString()
+        };
     }
+
+    safeStorage.setItem(dbKey, JSON.stringify(rows));
 }

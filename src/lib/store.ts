@@ -4,7 +4,6 @@ import { create } from 'zustand';
 import { AppState, Task, TaskNote, Project, Transaction, Goal, GoalTransaction, Note, Reminder, AppSettings } from './types';
 import { generateId } from './utils';
 import { fetchAllData, dbInsert, dbUpdate, dbDelete, dbUpsertSettings } from './db';
-import { supabase } from './supabase';
 
 const defaultSettings: AppSettings = {
     theme: 'dark',
@@ -15,10 +14,26 @@ const defaultSettings: AppSettings = {
     customPalettes: [],
 };
 
-// Get current user ID helper
+// Safe storage wrapper
+const safeStorage = {
+    getItem: (key: string): string | null => {
+        if (typeof window === 'undefined') return null;
+        try { return window.localStorage.getItem(key); } catch { return null; }
+    }
+};
+
+// Get current user ID helper from mock session
 const getUserId = async (): Promise<string | null> => {
-    const { data: { user } } = await supabase.auth.getUser();
-    return user?.id ?? null;
+    const sessionJson = safeStorage.getItem('ajanda_current_session');
+    if (sessionJson) {
+        try {
+            const session = JSON.parse(sessionJson);
+            return session.user?.id || null;
+        } catch {
+            return null;
+        }
+    }
+    return null;
 };
 
 export const useStore = create<AppState & {
@@ -36,10 +51,13 @@ export const useStore = create<AppState & {
     settings: defaultSettings,
     initialized: false,
 
-    // ===== INITIALIZE: Fetch all data from Supabase =====
+    // ===== INITIALIZE: Fetch all data from Mock local DB =====
     initializeData: async () => {
         const userId = await getUserId();
-        if (!userId) return;
+        if (!userId) {
+            set({ initialized: true });
+            return;
+        }
 
         try {
             const data = await fetchAllData(userId);
@@ -72,7 +90,7 @@ export const useStore = create<AppState & {
                 initialized: true,
             });
         } catch (error) {
-            console.error('Failed to initialize data from Supabase:', error);
+            console.error('Failed to initialize data from Local DB:', error);
             set({ initialized: true }); // Still mark as initialized so app doesn't hang
         }
     },
@@ -111,14 +129,14 @@ export const useStore = create<AppState & {
     // ===== TASK ACTIONS =====
     addTask: (data) => {
         const tasks = get().tasks;
-        const maxOrder = tasks.filter(t => t.parentId === data.parentId).reduce((max, t) => Math.max(max, t.orderIndex), -1);
+        const maxOrder = tasks.filter(t => t.parentId === data.parentId).reduce((max, t) => Math.max(max, t.orderIndex || 0), -1);
         const tempId = generateId();
         const now = new Date().toISOString();
         const task = {
             ...data, id: tempId, archived: false,
             orderIndex: maxOrder + 1, createdAt: now, updatedAt: now,
         };
-        set((s) => ({ tasks: [...s.tasks, task] }));
+        set((s) => ({ tasks: [...s.tasks, task as Task] }));
         getUserId().then(userId => {
             if (!userId) return;
             dbInsert('tasks', { ...data, userId, archived: false, orderIndex: maxOrder + 1 }).then(result => {
@@ -142,8 +160,11 @@ export const useStore = create<AppState & {
         };
         const toDelete = new Set([id, ...getDescIds(id)]);
         set((s) => ({ tasks: s.tasks.filter(t => !toDelete.has(t.id)) }));
-        // Delete from DB (cascade will handle children due to FK)
+        // Delete from DB (local cascade handles children)
         dbDelete('tasks', id).catch(console.error);
+        Array.from(toDelete).forEach(childId => {
+            if (childId !== id) dbDelete('tasks', childId).catch(console.error);
+        });
     },
     archiveTask: (id) => {
         set((s) => ({
@@ -191,7 +212,7 @@ export const useStore = create<AppState & {
     addTaskNote: (data) => {
         const tempId = generateId();
         const now = new Date().toISOString();
-        set((s) => ({ taskNotes: [...s.taskNotes, { ...data, id: tempId, createdAt: now }] }));
+        set((s) => ({ taskNotes: [...s.taskNotes, { ...data, id: tempId, createdAt: now }] as TaskNote[] }));
         getUserId().then(userId => {
             if (!userId) return;
             dbInsert('task_notes', { ...data, userId }).then(result => {
@@ -212,7 +233,7 @@ export const useStore = create<AppState & {
     addTransaction: (data) => {
         const tempId = generateId();
         const now = new Date().toISOString();
-        set((s) => ({ transactions: [...s.transactions, { ...data, id: tempId, createdAt: now }] }));
+        set((s) => ({ transactions: [...s.transactions, { ...data, id: tempId, createdAt: now }] as Transaction[] }));
         getUserId().then(userId => {
             if (!userId) return;
             dbInsert('transactions', { ...data, userId }).then(result => {
@@ -233,7 +254,7 @@ export const useStore = create<AppState & {
     addGoal: (data) => {
         const tempId = generateId();
         const now = new Date().toISOString();
-        set((s) => ({ goals: [...s.goals, { ...data, id: tempId, createdAt: now, updatedAt: now }] }));
+        set((s) => ({ goals: [...s.goals, { ...data, id: tempId, createdAt: now, updatedAt: now }] as Goal[] }));
         getUserId().then(userId => {
             if (!userId) return;
             dbInsert('goals', { ...data, userId }).then(result => {
@@ -260,7 +281,7 @@ export const useStore = create<AppState & {
             : Math.max(0, goal.currentSaved - data.amount);
         const tempId = generateId();
         set((s) => ({
-            goalTransactions: [...s.goalTransactions, { ...data, id: tempId }],
+            goalTransactions: [...s.goalTransactions, { ...data, id: tempId }] as GoalTransaction[],
             goals: s.goals.map(g => g.id === data.goalId ? { ...g, currentSaved: newSaved, updatedAt: new Date().toISOString() } : g),
         }));
         getUserId().then(userId => {
@@ -274,7 +295,7 @@ export const useStore = create<AppState & {
     addNote: (data) => {
         const tempId = generateId();
         const now = new Date().toISOString();
-        set((s) => ({ notes: [...s.notes, { ...data, id: tempId, createdAt: now, updatedAt: now }] }));
+        set((s) => ({ notes: [...s.notes, { ...data, id: tempId, createdAt: now, updatedAt: now }] as Note[] }));
         getUserId().then(userId => {
             if (!userId) return;
             dbInsert('notes', { ...data, userId }).then(result => {
@@ -295,7 +316,7 @@ export const useStore = create<AppState & {
     addReminder: (data) => {
         const tempId = generateId();
         const now = new Date().toISOString();
-        set((s) => ({ reminders: [...s.reminders, { ...data, id: tempId, createdAt: now }] }));
+        set((s) => ({ reminders: [...s.reminders, { ...data, id: tempId, createdAt: now }] as Reminder[] }));
         getUserId().then(userId => {
             if (!userId) return;
             dbInsert('reminders', { ...data, userId }).then(result => {
@@ -321,7 +342,7 @@ export const useStore = create<AppState & {
         });
     },
 
-    // ===== SEED & CLEAR (now DB-backed) =====
+    // ===== SEED & CLEAR =====
     seedData: async () => {
         const userId = await getUserId();
         if (!userId) return;
@@ -374,7 +395,7 @@ export const useStore = create<AppState & {
                 await dbInsert('notes', { ...data, userId });
             }
 
-            // Insert reminders (clear linkedId since old task IDs no longer exist)
+            // Insert reminders
             for (const r of seed.reminders) {
                 const { id, createdAt, linkedId, ...data } = r;
                 await dbInsert('reminders', { ...data, userId, linkedId: null, linkedType: null });
@@ -391,15 +412,17 @@ export const useStore = create<AppState & {
         if (!userId) return;
 
         try {
-            // Delete in order: children first, then parents (FK constraints)
-            await supabase.from('goal_transactions').delete().eq('user_id', userId);
-            await supabase.from('task_notes').delete().eq('user_id', userId);
-            await supabase.from('reminders').delete().eq('user_id', userId);
-            await supabase.from('notes').delete().eq('user_id', userId);
-            await supabase.from('transactions').delete().eq('user_id', userId);
-            await supabase.from('tasks').delete().eq('user_id', userId);
-            await supabase.from('goals').delete().eq('user_id', userId);
-            await supabase.from('projects').delete().eq('user_id', userId);
+            if (typeof window !== 'undefined') {
+                try { window.localStorage.removeItem('ajanda_goal_transactions'); } catch { }
+                try { window.localStorage.removeItem('ajanda_task_notes'); } catch { }
+                try { window.localStorage.removeItem('ajanda_reminders'); } catch { }
+                try { window.localStorage.removeItem('ajanda_notes'); } catch { }
+                try { window.localStorage.removeItem('ajanda_transactions'); } catch { }
+                try { window.localStorage.removeItem('ajanda_tasks'); } catch { }
+                try { window.localStorage.removeItem('ajanda_goals'); } catch { }
+                try { window.localStorage.removeItem('ajanda_projects'); } catch { }
+                // NOTE: We don't delete aja_users, we keep the auth so the user doesn't get logged out
+            }
 
             set({
                 projects: [],

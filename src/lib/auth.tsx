@@ -1,8 +1,27 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User, Session, AuthError } from '@supabase/supabase-js';
-import { supabase } from './supabase';
+import { generateId } from './utils';
+
+// Redefine basic types that were coming from Supabase
+export interface User {
+    id: string;
+    email: string;
+    user_metadata: {
+        full_name?: string;
+        avatar_url?: string;
+        [key: string]: any;
+    };
+}
+
+export interface Session {
+    access_token: string;
+    user: User;
+}
+
+export interface AuthError {
+    message: string;
+}
 
 interface AuthContextType {
     user: User | null;
@@ -19,130 +38,222 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
+// Safe storage wrapping to avoid errors on SSR
+const safeStorage = {
+    getItem: (key: string): string | null => {
+        if (typeof window === 'undefined') return null;
+        try { return window.localStorage.getItem(key); } catch { return null; }
+    },
+    setItem: (key: string, value: string) => {
+        if (typeof window === 'undefined') return;
+        try { window.localStorage.setItem(key, value); } catch { }
+    },
+    removeItem: (key: string) => {
+        if (typeof window === 'undefined') return;
+        try { window.localStorage.removeItem(key); } catch { }
+    }
+};
+
+const USERS_KEY = 'ajanda_users';
+const SESSION_KEY = 'ajanda_current_session';
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
     const [session, setSession] = useState<Session | null>(null);
     const [loading, setLoading] = useState(true);
 
+    // Initialize session from localStorage
     useEffect(() => {
-        let mounted = true;
-
-        const clearCorruptAuthStorage = () => {
-            if (typeof window === 'undefined') return;
+        const storedSession = safeStorage.getItem(SESSION_KEY);
+        if (storedSession) {
             try {
-                const keys = Object.keys(window.localStorage);
-                keys
-                    .filter(k =>
-                        (k.startsWith('sb-') && k.endsWith('-auth-token')) ||
-                        (k.startsWith('sb-') && k.includes('auth')) ||
-                        k.includes('supabase')
-                    )
-                    .forEach(k => window.localStorage.removeItem(k));
-            } catch {
-                // ignore storage access errors
+                const parsedSession = JSON.parse(storedSession) as Session;
+                // Verify user still exists
+                const usersJson = safeStorage.getItem(USERS_KEY);
+                const users = usersJson ? JSON.parse(usersJson) : [];
+                const foundUser = users.find((u: any) => u.id === parsedSession.user.id);
+
+                if (foundUser) {
+                    setSession(parsedSession);
+                    setUser(parsedSession.user);
+                } else {
+                    safeStorage.removeItem(SESSION_KEY);
+                }
+            } catch (e) {
+                console.error("Failed to parse local session", e);
+                safeStorage.removeItem(SESSION_KEY);
             }
-        };
-
-        supabase.auth.getSession()
-            .then(({ data: { session } }) => {
-                if (!mounted) return;
-                setSession(session);
-                setUser(session?.user ?? null);
-                setLoading(false);
-            })
-            .catch((err) => {
-                console.error('Failed to read Supabase session:', err);
-                clearCorruptAuthStorage();
-                if (!mounted) return;
-                setSession(null);
-                setUser(null);
-                setLoading(false);
-            });
-
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-            if (!mounted) return;
-            setSession(session);
-            setUser(session?.user ?? null);
-            setLoading(false);
-        });
-
-        return () => {
-            mounted = false;
-            subscription.unsubscribe();
-        };
+        }
+        setLoading(false);
     }, []);
 
     const signUp = async (email: string, password: string, fullName: string) => {
-        const { error } = await supabase.auth.signUp({
+        const usersJson = safeStorage.getItem(USERS_KEY);
+        const users = usersJson ? JSON.parse(usersJson) : [];
+
+        if (users.some((u: any) => u.email === email)) {
+            return { error: { message: "Bu e-posta adresi zaten kullanılıyor." } };
+        }
+
+        const newUser = {
+            id: generateId(),
             email,
-            password,
-            options: { data: { full_name: fullName } },
-        });
-        return { error };
+            password, // NOTE: In a real app this should be hashed. Fine for local-only mock.
+            user_metadata: { full_name: fullName }
+        };
+
+        const updatedUsers = [...users, newUser];
+        safeStorage.setItem(USERS_KEY, JSON.stringify(updatedUsers));
+
+        // Auto sign-in
+        const newSession = {
+            access_token: `mock-token-${Date.now()}`,
+            user: {
+                id: newUser.id,
+                email: newUser.email,
+                user_metadata: newUser.user_metadata
+            }
+        };
+
+        safeStorage.setItem(SESSION_KEY, JSON.stringify(newSession));
+        setSession(newSession);
+        setUser(newSession.user);
+
+        return { error: null };
     };
 
     const signIn = async (email: string, password: string) => {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        return { error };
+        const usersJson = safeStorage.getItem(USERS_KEY);
+        const users = usersJson ? JSON.parse(usersJson) : [];
+
+        const foundUser = users.find((u: any) => u.email === email && u.password === password);
+
+        if (!foundUser) {
+            return { error: { message: "Invalid login credentials" } };
+        }
+
+        const newSession = {
+            access_token: `mock-token-${Date.now()}`,
+            user: {
+                id: foundUser.id,
+                email: foundUser.email,
+                user_metadata: foundUser.user_metadata
+            }
+        };
+
+        safeStorage.setItem(SESSION_KEY, JSON.stringify(newSession));
+        setSession(newSession);
+        setUser(newSession.user);
+
+        return { error: null };
     };
 
     const signOut = async () => {
-        await supabase.auth.signOut();
+        safeStorage.removeItem(SESSION_KEY);
+        setSession(null);
+        setUser(null);
     };
 
     const updateProfile = async (data: { full_name?: string }) => {
-        const { error } = await supabase.auth.updateUser({ data });
-        if (!error) {
-            // Refresh user state
-            const { data: { user: updatedUser } } = await supabase.auth.getUser();
+        if (!user) return { error: { message: "Giriş yapılmamış" } };
+
+        try {
+            // Update users list
+            const usersJson = safeStorage.getItem(USERS_KEY);
+            let users = usersJson ? JSON.parse(usersJson) : [];
+
+            const userIndex = users.findIndex((u: any) => u.id === user.id);
+            if (userIndex === -1) return { error: { message: "Kullanıcı bulunamadı" } };
+
+            users[userIndex].user_metadata = { ...users[userIndex].user_metadata, ...data };
+            safeStorage.setItem(USERS_KEY, JSON.stringify(users));
+
+            // Update local state 
+            const updatedUser = { ...user, user_metadata: { ...user.user_metadata, ...data } };
+            const updatedSession = { ...session!, user: updatedUser };
+
+            safeStorage.setItem(SESSION_KEY, JSON.stringify(updatedSession));
             setUser(updatedUser);
+            setSession(updatedSession);
+
+            return { error: null };
+        } catch (e: any) {
+            return { error: { message: e.message } };
         }
-        return { error };
     };
 
     const updateEmail = async (newEmail: string) => {
-        const { error } = await supabase.auth.updateUser({ email: newEmail });
-        return { error };
+        if (!user) return { error: { message: "Giriş yapılmamış" } };
+
+        // Update users list
+        const usersJson = safeStorage.getItem(USERS_KEY);
+        let users = usersJson ? JSON.parse(usersJson) : [];
+
+        if (users.some((u: any) => u.email === newEmail && u.id !== user.id)) {
+            return { error: { message: "Bu e-posta adresi zaten kullanılıyor." } };
+        }
+
+        const userIndex = users.findIndex((u: any) => u.id === user.id);
+        if (userIndex === -1) return { error: { message: "Kullanıcı bulunamadı" } };
+
+        users[userIndex].email = newEmail;
+        safeStorage.setItem(USERS_KEY, JSON.stringify(users));
+
+        // Update local state
+        const updatedUser = { ...user, email: newEmail };
+        const updatedSession = { ...session!, user: updatedUser };
+
+        safeStorage.setItem(SESSION_KEY, JSON.stringify(updatedSession));
+        setUser(updatedUser);
+        setSession(updatedSession);
+
+        return { error: null };
     };
 
     const updatePassword = async (newPassword: string) => {
-        const { error } = await supabase.auth.updateUser({ password: newPassword });
-        return { error };
+        if (!user) return { error: { message: "Giriş yapılmamış" } };
+
+        // Update users list
+        const usersJson = safeStorage.getItem(USERS_KEY);
+        let users = usersJson ? JSON.parse(usersJson) : [];
+
+        const userIndex = users.findIndex((u: any) => u.id === user.id);
+        if (userIndex === -1) return { error: { message: "Kullanıcı bulunamadı" } };
+
+        users[userIndex].password = newPassword;
+        safeStorage.setItem(USERS_KEY, JSON.stringify(users));
+
+        return { error: null };
     };
 
     const uploadAvatar = async (file: File): Promise<{ url: string | null; error: string | null }> => {
         if (!user) return { url: null, error: 'Giriş yapılmamış' };
 
-        const fileExt = file.name.split('.').pop();
-        const filePath = `${user.id}/avatar.${fileExt}`;
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = async () => {
+                const base64String = reader.result as string;
 
-        // Upload to Supabase Storage
-        const { error: uploadError } = await supabase.storage
-            .from('avatars')
-            .upload(filePath, file, { upsert: true });
+                // localStorage warning!
+                if (base64String.length > 2000000) {
+                    resolve({ url: null, error: 'Görsel boyutu çok büyük (Local Storage sınırı)' });
+                    return;
+                }
 
-        if (uploadError) {
-            return { url: null, error: uploadError.message };
-        }
+                const { error } = await updateProfile({ avatar_url: base64String });
 
-        // Get public URL
-        const { data } = supabase.storage.from('avatars').getPublicUrl(filePath);
-        const avatarUrl = data.publicUrl + '?t=' + Date.now(); // cache bust
+                if (error) {
+                    resolve({ url: null, error: error.message });
+                } else {
+                    resolve({ url: base64String, error: null });
+                }
+            };
+            reader.onerror = () => {
+                resolve({ url: null, error: 'Dosya okuma hatası' });
+            };
 
-        // Save URL to user metadata
-        const { error: updateError } = await supabase.auth.updateUser({
-            data: { avatar_url: avatarUrl },
+            reader.readAsDataURL(file);
         });
-
-        if (updateError) {
-            return { url: null, error: updateError.message };
-        }
-
-        // Refresh user state
-        const { data: { user: updatedUser } } = await supabase.auth.getUser();
-        setUser(updatedUser);
-
-        return { url: avatarUrl, error: null };
     };
 
     return (
